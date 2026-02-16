@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  kafka:
+    image: confluentinc/cp-kafka:7.8.6
+    container_name: kafka
+    ports:
+      - "9092:9092"
+
+    environment:
+      KAFKA_KRAFT_MODE: 'true' #KRaft вместе ZooKeeper
+
+      CLUSTER_ID: '1L6g7nGhU-eAKfL--X25wo'  # генерется идентификатор KRaft-кластера
+      KAFKA_NODE_ID: 1
+
+      # В "combined mode" одна нода может быть и broker, и controller
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      # Кворум контроллеров: список "nodeId@host:controllerPort".
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      # Фактор репликации для внутреннего топика offsets. по умолчанию 3
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+      # Где Kafka слушает подключения:
+      # - PLAINTEXT: клиенты/брокеры
+      # - CONTROLLER: канал контроллера (KRaft metadata quorum)
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+      # IMPORTANT: advertised listeners — то, что Kafka “раздает” клиентам как адрес для подключения.
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://localhost:9092"
+      # Какие listener'ы относятся к контроллеру (должно совпадать с именем в KAFKA_LISTENERS)
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      # Маппинг "имя listener -> протокол"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+
+      # Директории логов/данных Kafka внутри контейнера
+      KAFKA_LOG_DIRS: "/tmp/kraft-combined-logs"
+
+    volumes:
+      - kafka_kraft:/var/lib/kafka/data  # персистентное хранилище данных (чтобы не терять их при перезапуске)
+
+volumes:
+  kafka_kraft:
