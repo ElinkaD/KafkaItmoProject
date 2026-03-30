@@ -2,14 +2,13 @@
 #Формат отправки в Kafka рекомендую использовать форматы protobuf или avro
 
 import io
-import os
-from pathlib import Path
 
 import pandas as pd
 from confluent_kafka import Producer
 from fastavro import parse_schema, schemaless_writer
 
-from schema import AVRO_SCHEMA
+from shared.config import require_env, require_path_env
+from shared.schema import AVRO_SCHEMA
 
 schema = parse_schema(AVRO_SCHEMA)
 
@@ -26,21 +25,14 @@ def delivery_report(err, msg):
 
 
 def main() -> None:
-    bootstrap_servers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
-    kafka_topic = os.getenv("KAFKA_TOPIC", "e-commerce-data")
-    csv_path_env = os.getenv("CSV_PATH")
-    csv_path = Path(csv_path_env or "data/E-Commerce Data.csv")
-
-    if csv_path_env is None and not csv_path.exists():
-        fallback_paths = [
-            Path("data/E-Commerce Data.csv"),
-        ]
-        csv_path = next((path for path in fallback_paths if path.exists()), csv_path)
+    bootstrap_servers = require_env("KAFKA_BOOTSTRAP_SERVERS")
+    kafka_topic = require_env("KAFKA_TOPIC")
+    csv_path = require_path_env("CSV_PATH")
 
     if not csv_path.exists():
         raise FileNotFoundError(
             f"CSV file was not found: {csv_path}. "
-            "Place the dataset there or override CSV_PATH."
+            "Place the dataset there or set CSV_PATH in .env.local."
         )
 
     producer = Producer({"bootstrap.servers": bootstrap_servers})
