@@ -4,7 +4,8 @@ from pyspark.sql import SparkSession
 from pyspark.sql.avro.functions import from_avro
 from pyspark.sql.functions import col
 
-from schema import AVRO_SCHEMA_JSON
+from shared.config import require_env
+from shared.schema import AVRO_SCHEMA_JSON
 
 
 def is_truthy(value: str | None) -> bool:
@@ -12,13 +13,10 @@ def is_truthy(value: str | None) -> bool:
 
 
 def main() -> None:
-    kafka_bootstrap = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
-    kafka_topic = os.getenv("KAFKA_TOPIC", "e-commerce-data")
-    output_path = os.getenv("OUTPUT_PATH", "output/parquet")
-    checkpoint_path = os.getenv(
-        "CHECKPOINT_PATH",
-        "output/checkpoints/kafka_to_parquet",
-    )
+    kafka_bootstrap = require_env("KAFKA_BOOTSTRAP_SERVERS")
+    kafka_topic = require_env("KAFKA_TOPIC")
+    output_path = require_env("OUTPUT_PATH")
+    checkpoint_path = require_env("CHECKPOINT_PATH")
     available_now = is_truthy(os.getenv("SPARK_AVAILABLE_NOW"))
 
     spark = (

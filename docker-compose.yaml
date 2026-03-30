@@ -21,19 +21,57 @@ services:
       # Где Kafka слушает подключения:
       # - PLAINTEXT: клиенты/брокеры
       # - CONTROLLER: канал контроллера (KRaft metadata quorum)
-      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
       # IMPORTANT: advertised listeners — то, что Kafka “раздает” клиентам как адрес для подключения.
-      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://localhost:9092"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092"
       # Какие listener'ы относятся к контроллеру (должно совпадать с именем в KAFKA_LISTENERS)
       KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
       # Маппинг "имя listener -> протокол"
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
 
       # Директории логов/данных Kafka внутри контейнера
       KAFKA_LOG_DIRS: "/tmp/kraft-combined-logs"
 
     volumes:
       - kafka_kraft:/var/lib/kafka/data  # персистентное хранилище данных (чтобы не терять их при перезапуске)
+
+  jobmanager:
+    build:
+      context: .
+      dockerfile: docker/flink/Dockerfile
+    container_name: flink-jobmanager
+    command: jobmanager
+    env_file:
+      - .env.local
+    depends_on:
+      - kafka
+    ports:
+      - "8081:8081"
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: jobmanager
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+
+  taskmanager:
+    build:
+      context: .
+      dockerfile: docker/flink/Dockerfile
+    container_name: flink-taskmanager
+    command: taskmanager
+    env_file:
+      - .env.local
+    depends_on:
+      - jobmanager
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: jobmanager
+        taskmanager.numberOfTaskSlots: 2
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
 
 volumes:
   kafka_kraft:
