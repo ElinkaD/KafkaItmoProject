@@ -23,7 +23,7 @@ TRIGGER_ID ?=
 
 .DEFAULT_GOAL := lab1-run
 
-.PHONY: venv install kafka-up flink-up producer spark-once show-parquet lab1-run clean-output lab2-create-topic lab2-producer lab2-submit lab2-run lab2-list-jobs lab2-stop-savepoint lab2-savepoint-status lab2-run-from-savepoint lab2-verify lab2-clean
+.PHONY: venv install kafka-up flink-up producer spark-once show-parquet lab1-run clean-output lab2-prepare-output lab2-create-topic lab2-producer lab2-submit lab2-run lab2-list-jobs lab2-stop-savepoint lab2-savepoint-status lab2-run-from-savepoint lab2-verify lab2-clean
 
 venv:
 	$(PYTHON) -m venv $(VENV)
@@ -61,7 +61,10 @@ lab2-producer:
 lab2-create-topic:
 	$(DOCKER_COMPOSE) exec -T kafka sh -lc 'kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic "$(LAB2_KAFKA_TOPIC)" --partitions 1 --replication-factor 1'
 
-lab2-submit: lab2-create-topic
+lab2-prepare-output:
+	$(DOCKER_COMPOSE) exec -T jobmanager sh -lc 'mkdir -p /workspace/data/output/lab2/parquet /workspace/data/output/lab2/checkpoints /workspace/data/output/lab2/savepoints && chmod -R 777 /workspace/data/output/lab2'
+
+lab2-submit: lab2-create-topic lab2-prepare-output
 	$(DOCKER_COMPOSE) exec -T \
 		-e PYTHONPATH="$(LAB2_CONTAINER_ROOT)" \
 		-e PYFLINK_CLIENT_EXECUTABLE="python3" \
@@ -95,6 +98,7 @@ lab2-savepoint-status:
 	curl -sS "$(FLINK_REST_URL)/jobs/$(JOB_ID)/savepoints/$(TRIGGER_ID)"
 
 lab2-run-from-savepoint:
+	$(MAKE) lab2-prepare-output
 	$(DOCKER_COMPOSE) exec -T \
 		-e PYTHONPATH="$(LAB2_CONTAINER_ROOT)" \
 		-e PYFLINK_CLIENT_EXECUTABLE="python3" \

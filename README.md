@@ -33,6 +33,38 @@ make lab1-run
 - `shared/schema.py` используется как общая схема проекта.
 - checkpoint и savepoint разделены в `data/output/lab2`.
 
+Схема работы приложения:
+
+```text
+make flink-up
+-> docker compose up -d kafka jobmanager taskmanager
+-> поднимается Kafka и кластер Flink
+
+make lab2-submit
+-> docker compose exec jobmanager flink run -d -py /workspace/lab2/flink_job.py
+-> Flink запускает Python job внутри кластера
+
+make lab2-producer
+-> lab2/producer.py читает CSV
+-> отправляет JSON-сообщения в Kafka topic e-commerce-data-lab2
+
+lab2/flink_job.py
+-> читает данные из Kafka
+-> обрабатывает их в PyFlink
+-> сохраняет результат в data/output/lab2/parquet
+```
+
+Поток данных:
+
+```text
+CSV
+-> lab2/producer.py
+-> Kafka topic
+-> lab2/flink_job.py
+-> Flink JobManager / TaskManager
+-> data/output/lab2/parquet
+```
+
 Запуск:
 
 ```bash
@@ -44,7 +76,7 @@ make lab2-producer
 Для замедления обработки в Python UDF можно выставить в `.env.local`:
 
 ```bash
-FLINK_MAP_DELAY_MS=200
+FLINK_MAP_DELAY_MS=5
 ```
 
 Полезные команды:
@@ -52,6 +84,7 @@ FLINK_MAP_DELAY_MS=200
 ```bash
 make lab2-list-jobs
 make lab2-stop-savepoint JOB_ID=<job_id>
+make lab2-savepoint-status JOB_ID=3e94630228d7b26bdd5e1f0e71ce8f99 TRIGGER_ID=1251d34e305d569187fb77b21f55a179
 make lab2-run-from-savepoint SAVEPOINT=file:///workspace/data/output/lab2/savepoints/<savepoint_dir>
 make lab2-verify
 ```

@@ -41,7 +41,10 @@ services:
       context: .
       dockerfile: docker/flink/Dockerfile
     container_name: flink-jobmanager
-    command: jobmanager
+    entrypoint:
+      - /bin/sh
+      - -lc
+      - mkdir -p /workspace/data/output/lab2/parquet /workspace/data/output/lab2/checkpoints /workspace/data/output/lab2/savepoints && chmod -R 777 /workspace/data/output/lab2 && exec /docker-entrypoint.sh jobmanager
     env_file:
       - .env.local
     depends_on:
@@ -60,7 +63,10 @@ services:
       context: .
       dockerfile: docker/flink/Dockerfile
     container_name: flink-taskmanager
-    command: taskmanager
+    entrypoint:
+      - /bin/sh
+      - -lc
+      - mkdir -p /workspace/data/output/lab2/parquet /workspace/data/output/lab2/checkpoints /workspace/data/output/lab2/savepoints && chmod -R 777 /workspace/data/output/lab2 && exec /docker-entrypoint.sh taskmanager
     env_file:
       - .env.local
     depends_on:
