@@ -12,6 +12,7 @@ SPARK_PACKAGES := org.apache.spark:spark-sql-kafka-0-10_2.13:4.1.1,org.apache.sp
 DOCKER_COMPOSE ?= docker compose
 LAB1_DIR := lab1
 LAB2_DIR := lab2
+LAB3_DIR := lab3
 LAB1_OUTPUT_DIR ?= data/output/lab1
 LAB2_CONTAINER_ROOT ?= /workspace
 LAB2_OUTPUT_DIR ?= $(CURDIR)/data/output/lab2
@@ -23,7 +24,7 @@ TRIGGER_ID ?=
 
 .DEFAULT_GOAL := lab1-run
 
-.PHONY: venv install kafka-up flink-up producer spark-once show-parquet lab1-run clean-output lab2-prepare-output lab2-create-topic lab2-producer lab2-submit lab2-run lab2-list-jobs lab2-stop-savepoint lab2-savepoint-status lab2-run-from-savepoint lab2-verify lab2-clean
+.PHONY: venv install kafka-up flink-up producer spark-once show-parquet lab1-run clean-output lab2-prepare-output lab2-create-topic lab2-producer lab2-submit lab2-run lab2-list-jobs lab2-stop-savepoint lab2-savepoint-status lab2-run-from-savepoint lab2-verify lab2-clean lab3-create-topic lab3-submit lab3-producer lab3-run
 
 venv:
 	$(PYTHON) -m venv $(VENV)
@@ -121,3 +122,30 @@ lab2-verify:
 lab2-clean:
 	$(DOCKER_COMPOSE) exec -T jobmanager sh -lc 'rm -rf /workspace/data/output/lab2' || true
 	mkdir -p $(LAB2_OUTPUT_DIR)/parquet $(LAB2_OUTPUT_DIR)/checkpoints $(LAB2_OUTPUT_DIR)/savepoints
+
+lab3-create-topic:
+	$(DOCKER_COMPOSE) exec -T kafka sh -lc 'kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic "$(LAB3_KAFKA_TOPIC)" --partitions 1 --replication-factor 1'
+
+lab3-submit:
+	$(DOCKER_COMPOSE) exec -T \
+		-e PYTHONPATH="$(LAB2_CONTAINER_ROOT)" \
+		-e PYFLINK_CLIENT_EXECUTABLE="python3" \
+		-e PYFLINK_PYTHON="python3" \
+		-e KAFKA_BOOTSTRAP_SERVERS="$(LAB3_FLINK_BOOTSTRAP_SERVERS)" \
+		-e KAFKA_TOPIC="$(LAB3_KAFKA_TOPIC)" \
+		-e KAFKA_GROUP_ID="$(LAB3_KAFKA_GROUP_ID)" \
+		-e FLINK_CHECKPOINT_INTERVAL_MS="$(FLINK_CHECKPOINT_INTERVAL_MS)" \
+		-e FLINK_PIPELINE_NAME="$(LAB3_FLINK_PIPELINE_NAME)" \
+		-e LAB3_WINDOW_SIZE_SEC="$(LAB3_WINDOW_SIZE_SEC)" \
+		-e LAB3_WATERMARK_OUT_OF_ORDER_SEC="$(LAB3_WATERMARK_OUT_OF_ORDER_SEC)" \
+		-e LAB3_ALLOWED_LATENESS_SEC="$(LAB3_ALLOWED_LATENESS_SEC)" \
+		jobmanager \
+		flink run -d -py $(LAB2_CONTAINER_ROOT)/$(LAB3_DIR)/flink_job.py
+
+lab3-producer:
+	env PYTHONPATH="$(CURDIR)" KAFKA_BOOTSTRAP_SERVERS="$(LAB3_PRODUCER_BOOTSTRAP_SERVERS)" KAFKA_TOPIC="$(LAB3_KAFKA_TOPIC)" PRODUCER_MODE="$(PRODUCER_MODE)" LAB3_EVENTS_COUNT="$(LAB3_EVENTS_COUNT)" LAB3_SEND_INTERVAL_MS="$(LAB3_SEND_INTERVAL_MS)" LAB3_RANDOM_SEED="$(LAB3_RANDOM_SEED)" LAB3_OUT_OF_ORDER_RATIO="$(LAB3_OUT_OF_ORDER_RATIO)" LAB3_LATE_RATIO="$(LAB3_LATE_RATIO)" LAB3_LATE_SHIFT_MIN_SEC="$(LAB3_LATE_SHIFT_MIN_SEC)" LAB3_LATE_SHIFT_MAX_SEC="$(LAB3_LATE_SHIFT_MAX_SEC)" LAB3_DELAY_RELEASE_MIN_EVENTS="$(LAB3_DELAY_RELEASE_MIN_EVENTS)" LAB3_DELAY_RELEASE_MAX_EVENTS="$(LAB3_DELAY_RELEASE_MAX_EVENTS)" $(VENV_PYTHON) -m $(LAB3_DIR).producer
+
+lab3-run:
+	$(MAKE) flink-up
+	$(MAKE) lab3-create-topic LAB3_KAFKA_TOPIC="$(LAB3_KAFKA_TOPIC)"
+	$(MAKE) lab3-submit LAB3_KAFKA_TOPIC="$(LAB3_KAFKA_TOPIC)"

@@ -17,5 +17,13 @@ def require_int_env(name: str) -> int:
         raise RuntimeError(f"Environment variable {name} must be an integer, got {value!r}") from exc
 
 
+def require_float_env(name: str) -> float:
+    value = require_env(name)
+    try:
+        return float(value)
+    except ValueError as exc:
+        raise RuntimeError(f"Environment variable {name} must be a float, got {value!r}") from exc
+
+
 def require_path_env(name: str) -> Path:
     return Path(require_env(name))
