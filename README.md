@@ -1,9 +1,10 @@
 # KafkaItmoProject
 
-Учебный проект с двумя отдельными лабораторными работами:
+Учебный проект с тремя отдельными лабораторными работами:
 
 - `lab1`: `CSV -> Kafka -> Spark Structured Streaming -> Parquet`
 - `lab2`: `CSV -> Kafka -> Flink -> Parquet`
+- `lab3`: `Event Generator -> Kafka -> Flink (DataStream API, Event Time Windows) -> Console`
 
 ## Конфигурация
 
@@ -90,3 +91,53 @@ make lab2-verify
 ```
 
 Flink Web UI после запуска доступен на `http://localhost:8081`.
+
+## Lab 3
+
+ТЗ 3 практического занятия:
+
+- написать producer, который генерирует события и отправляет их в Kafka;
+- Flink читает события, обрабатывает по event time и считает оконные агрегаты;
+- агрегат: общее количество сообщений в окне (tumbling window);
+- результаты окон выводятся в консоль по мере срабатывания окон.
+
+Формат события:
+
+- `event_id`
+- `user_id`
+- `event_type`
+- `event_time`
+
+Producer поддерживает 3 режима:
+
+- `normal`: большая часть событий отправляется по порядку;
+- `out_of_order`: часть событий (по умолчанию около 25%) отправляется не по порядку из буфера;
+- `late`: часть событий (по умолчанию около 15%) отправляется с задержкой позже новых событий.
+
+Реализация в проекте:
+
+- `lab3/producer.py` генерирует синтетические события;
+- `lab3/event_types.py` содержит банк `event_type`;
+- `lab3/flink_job.py` реализован через DataStream API:
+  - чтение из Kafka;
+  - извлечение `event_time`;
+  - watermarks для out-of-order;
+  - `allowed_lateness` для поздних событий;
+  - tumbling event-time window и подсчет количества сообщений.
+
+Запуск:
+
+```bash
+make flink-up
+make lab3-create-topic
+make lab3-submit
+PRODUCER_MODE=normal make lab3-producer
+PRODUCER_MODE=out_of_order make lab3-producer
+PRODUCER_MODE=late make lab3-producer
+```
+
+Проверка результата:
+
+```bash
+docker logs -f flink-taskmanager
+```
