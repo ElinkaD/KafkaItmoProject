@@ -1,10 +1,11 @@
 # KafkaItmoProject
 
-Учебный проект с тремя отдельными лабораторными работами:
+Учебный проект с четырьмя отдельными лабораторными работами:
 
 - `lab1`: `CSV -> Kafka -> Spark Structured Streaming -> Parquet`
 - `lab2`: `CSV -> Kafka -> Flink -> Parquet`
 - `lab3`: `Event Generator -> Kafka -> Flink (DataStream API, Event Time Windows) -> Console`
+- `lab4`: `Events + Rules -> Kafka -> Flink (Keyed State, Blocking, TTL) -> Console`
 
 ## Конфигурация
 
@@ -134,10 +135,27 @@ make lab3-submit
 PRODUCER_MODE=normal make lab3-producer
 PRODUCER_MODE=out_of_order make lab3-producer
 PRODUCER_MODE=late make lab3-producer
-```
 
-Проверка результата:
+## Lab 4
+
+ТЗ 4 практического занятия:
+
+- реализовать поток `events` с полями `userId`, `eventType`, `value`, `timestamp`;
+- `userId` должен идти последовательно по кругу от `1` до `100`;
+- реализовать поток `rules` с полем `blockedUser`;
+- поток `rules` должен нечасто публиковать случайного заблокированного пользователя;
+- основной поток `events` должен обрабатываться во Flink по ключу `userId`;
+- для каждого пользователя нужно хранить `ListState<Double>` со значениями `value`;
+- при обработке события нужно считать сумму по всему списку значений пользователя;
+- при поступлении нового `blockedUser` накопленная статистика этого пользователя больше не должна использоваться;
+- для состояния должен быть настроен `StateTtlConfig` с TTL `10` секунд;
+- в конце обработки нужно периодически выводить текущую сумму `value` по пользователям.
+
+Запуск:
 
 ```bash
-docker logs -f flink-taskmanager
+make flink-up
+make lab4-create-topics
+make lab4-submit
+make lab4-producer
 ```

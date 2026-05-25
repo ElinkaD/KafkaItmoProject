@@ -13,6 +13,7 @@ DOCKER_COMPOSE ?= docker compose
 LAB1_DIR := lab1
 LAB2_DIR := lab2
 LAB3_DIR := lab3
+LAB4_DIR := lab4
 LAB1_OUTPUT_DIR ?= data/output/lab1
 LAB2_CONTAINER_ROOT ?= /workspace
 LAB2_OUTPUT_DIR ?= $(CURDIR)/data/output/lab2
@@ -24,7 +25,7 @@ TRIGGER_ID ?=
 
 .DEFAULT_GOAL := lab1-run
 
-.PHONY: venv install kafka-up flink-up producer spark-once show-parquet lab1-run clean-output lab2-prepare-output lab2-create-topic lab2-producer lab2-submit lab2-run lab2-list-jobs lab2-stop-savepoint lab2-savepoint-status lab2-run-from-savepoint lab2-verify lab2-clean lab3-create-topic lab3-submit lab3-producer lab3-run
+.PHONY: venv install kafka-up flink-up producer spark-once show-parquet lab1-run clean-output lab2-prepare-output lab2-create-topic lab2-producer lab2-submit lab2-run lab2-list-jobs lab2-stop-savepoint lab2-savepoint-status lab2-run-from-savepoint lab2-verify lab2-clean lab3-create-topic lab3-submit lab3-producer lab3-run lab4-create-topics lab4-submit lab4-producer lab4-logs lab4-run
 
 venv:
 	$(PYTHON) -m venv $(VENV)
@@ -149,3 +150,34 @@ lab3-run:
 	$(MAKE) flink-up
 	$(MAKE) lab3-create-topic LAB3_KAFKA_TOPIC="$(LAB3_KAFKA_TOPIC)"
 	$(MAKE) lab3-submit LAB3_KAFKA_TOPIC="$(LAB3_KAFKA_TOPIC)"
+
+lab4-create-topics:
+	$(DOCKER_COMPOSE) exec -T kafka sh -lc 'kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic "$(LAB4_EVENTS_TOPIC)" --partitions 1 --replication-factor 1'
+	$(DOCKER_COMPOSE) exec -T kafka sh -lc 'kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic "$(LAB4_RULES_TOPIC)" --partitions 1 --replication-factor 1'
+
+lab4-submit:
+	$(DOCKER_COMPOSE) exec -T \
+		-e PYTHONPATH="$(LAB2_CONTAINER_ROOT)" \
+		-e PYFLINK_CLIENT_EXECUTABLE="python3" \
+		-e PYFLINK_PYTHON="python3" \
+		-e LAB4_FLINK_BOOTSTRAP_SERVERS="$(LAB4_FLINK_BOOTSTRAP_SERVERS)" \
+		-e LAB4_EVENTS_TOPIC="$(LAB4_EVENTS_TOPIC)" \
+		-e LAB4_RULES_TOPIC="$(LAB4_RULES_TOPIC)" \
+		-e LAB4_EVENTS_GROUP_ID="$(LAB4_EVENTS_GROUP_ID)" \
+		-e LAB4_RULES_GROUP_ID="$(LAB4_RULES_GROUP_ID)" \
+		-e LAB4_FLINK_PIPELINE_NAME="$(LAB4_FLINK_PIPELINE_NAME)" \
+		-e LAB4_EMIT_INTERVAL_MS="$(LAB4_EMIT_INTERVAL_MS)" \
+		-e FLINK_CHECKPOINT_INTERVAL_MS="$(FLINK_CHECKPOINT_INTERVAL_MS)" \
+		jobmanager \
+		flink run -d -py $(LAB2_CONTAINER_ROOT)/$(LAB4_DIR)/flink_job.py
+
+lab4-producer:
+	env PYTHONPATH="$(CURDIR)" LAB4_PRODUCER_BOOTSTRAP_SERVERS="$(LAB4_PRODUCER_BOOTSTRAP_SERVERS)" LAB4_EVENTS_TOPIC="$(LAB4_EVENTS_TOPIC)" LAB4_RULES_TOPIC="$(LAB4_RULES_TOPIC)" LAB4_EVENTS_COUNT="$(LAB4_EVENTS_COUNT)" LAB4_SEND_INTERVAL_MS="$(LAB4_SEND_INTERVAL_MS)" LAB4_RULE_FREQUENCY_EVENTS="$(LAB4_RULE_FREQUENCY_EVENTS)" LAB4_RANDOM_SEED="$(LAB4_RANDOM_SEED)" LAB4_MIN_VALUE="$(LAB4_MIN_VALUE)" LAB4_MAX_VALUE="$(LAB4_MAX_VALUE)" $(VENV_PYTHON) -m $(LAB4_DIR).producer
+
+lab4-logs:
+	docker logs -f flink-taskmanager
+
+lab4-run:
+	$(MAKE) flink-up
+	$(MAKE) lab4-create-topics LAB4_EVENTS_TOPIC="$(LAB4_EVENTS_TOPIC)" LAB4_RULES_TOPIC="$(LAB4_RULES_TOPIC)"
+	$(MAKE) lab4-submit LAB4_EVENTS_TOPIC="$(LAB4_EVENTS_TOPIC)" LAB4_RULES_TOPIC="$(LAB4_RULES_TOPIC)"
